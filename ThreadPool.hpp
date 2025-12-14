@@ -55,13 +55,11 @@ struct Task {
         // 创建promise，与future绑定（用户通过future获取结果/异常）
         this->promise = std::make_shared<std::promise<std::any>>();
     }
-
     // 移动构造函数：支持任务对象的移动语义（避免拷贝开销）
     Task(Task&& other) noexcept
         : func(std::move(other.func))
         , promise(std::move(other.promise)) {
     }
-
     // 移动赋值运算符：支持任务对象的移动赋值
     Task& operator=(Task&& other) noexcept {
         if (this != &other) {
@@ -100,9 +98,7 @@ public:
             maxCapacity = std::numeric_limits<int>::max();
         }
     }
-
     ~TaskQueue() = default; // 析构函数：无需额外操作（容器自动释放）
-
     // 绑定线程池的条件变量：多线程池共享时，每个线程池必须调用此接口
     void bindConditionVariable(std::condition_variable* cond) {
         if (cond == nullptr || queueShutdown.load()) {
@@ -120,7 +116,6 @@ public:
         notifyConds.push_back(cond);
         std::cout << "[任务队列] 成功绑定条件变量，当前绑定数：" << notifyConds.size() << std::endl;
     }
-
     // 解绑线程池的条件变量：线程池销毁/关机时调用，避免野指针
     void unbindConditionVariable(std::condition_variable* cond) {
         if (cond == nullptr) return;
@@ -131,7 +126,6 @@ public:
             std::cout << "[任务队列] 成功解绑条件变量，当前绑定数：" << notifyConds.size() << std::endl;
         }
     }
-
     // 核心接口：提交任意任务（兼容有/无返回值），返回future供用户获取结果
     template<typename Func, typename... Args>
     std::future<std::any> submitTask(Func&& func, Args&&... args) {
@@ -165,7 +159,6 @@ public:
         wakeupAllBoundPools(); // 唤醒所有关联线程池的空闲线程（多池共享核心）
         return future;
     }
-
     // 工作线程调用：从队列取出任务（非阻塞，无任务返回nullopt）
     std::optional<Task> taskTake() {
         std::lock_guard<std::mutex> lock(queueMutex); // 加锁保护队列操作
@@ -180,7 +173,6 @@ public:
         queueSize--; // 任务数原子递减
         return task;
     }
-
     // 唤醒所有关联线程池的一个空闲线程：任务入队时调用，确保所有线程池感知任务
     void wakeupAllBoundPools() {
         std::lock_guard<std::mutex> lock(queueMutex); // 加锁保护条件变量列表
@@ -193,7 +185,6 @@ public:
             std::cout << "[任务队列] 唤醒所有关联线程池（" << notifyConds.size() << "个），各唤醒一个线程" << std::endl;
         }
     }
-
     // 强制唤醒所有关联线程池的所有线程：线程池/队列关闭时调用，确保线程正常退出
     void wakeupAllThreadsInBoundPools() {
         std::lock_guard<std::mutex> lock(queueMutex); // 加锁保护条件变量列表
@@ -204,7 +195,6 @@ public:
         }
         std::cout << "[任务队列] 强制唤醒所有关联线程池的所有线程" << std::endl;
     }
-
     // 关闭队列：拒绝新任务，唤醒所有线程处理剩余任务
     void shutdownQueue() {
         if (queueShutdown.load()) return;
@@ -212,7 +202,6 @@ public:
         wakeupAllThreadsInBoundPools(); // 唤醒所有线程处理剩余任务
         std::cout << "[任务队列] 队列已关闭，拒绝新任务，唤醒所有线程处理剩余任务" << std::endl;
     }
-
     // 判断队列是否已关闭：供外部线程池检查状态
     bool isQueueShutdown() const {
         return queueShutdown.load();
@@ -228,7 +217,6 @@ public:
         maxCapacity = capacity;
         std::cout << "[任务队列] 最大容量设置为：" << capacity << "（当前任务数：" << queueSize.load() << "）" << std::endl;
     }
-
     // 获取当前队列任务数（线程安全）
     int getCurrentSize() const { return queueSize.load(); }
     // 获取队列最大容量（线程安全）
@@ -370,7 +358,6 @@ public:
         fixedGuardThread = std::thread([this] {this->fixedGuardFunc(); });
         std::cout << PoolName << "[初始化] 创建守护者线程，tid=" << fixedGuardThread.get_id() << std::endl;
     }
-
     // CACHED模式构造函数：动态扩缩容（核心线程数+最大线程数）
     ThreadPool(std::string name, TaskQueue* taskq, PoolMode mode, int min, int max)
         : PoolName(name)
@@ -402,7 +389,6 @@ public:
         managerThread = std::thread([this] { this->managerFunc(); });
         std::cout << PoolName << "[初始化] 创建管理者线程，tid=" << managerThread.get_id() << std::endl;
     }
-
     // 析构函数：核心！自动解绑队列关联+关闭线程池（确保资源回收）
     ~ThreadPool() {
         std::cout << PoolName << "[析构] 线程池开始销毁，自动解绑任务队列关联" << std::endl;
@@ -415,7 +401,6 @@ public:
         }
         std::cout << PoolName << "[析构] 线程池销毁完成" << std::endl;
     }
-
     // 核心接口：提交任务（对外暴露，兼容任意函数+参数）
     template<typename Func, typename... Args>
     std::future<std::any> submitTask(Func&& func, Args&&... args) {
@@ -430,7 +415,6 @@ public:
         // 委托给任务队列的submitTask（统一逻辑）
         return TaskQ->submitTask(std::forward<Func>(func), std::forward<Args>(args)...);
     }
-
     // 关闭线程池：优雅退出，回收所有线程（可手动调用，析构时自动调用）
     void shutdownPool() {
         if (shutdown.load() || !isInitTrue) {
@@ -485,7 +469,98 @@ public:
         std::cout << PoolName << "[关机] 线程池关闭完成，回收" << liveNum.load() << "个核心线程" << std::endl;
         isInitTrue = false; // 标记未初始化
     }
+    // 辅助接口：获取线程池名称（用于测试和日志）
+    std::string getPoolName() const {
+        return PoolName;
+    }
+    // 重启线程池：仅支持已关闭且队列未关闭的线程池
+    void resumePool() {
+        if (!shutdown.load() || TaskQ->isQueueShutdown()) {
+            std::cerr << PoolName << "[重启] 无法重启：未关闭或队列已关闭" << std::endl;
+            return;
+        }
 
+        shutdown.store(false); // 重置关闭标志
+        exitNum.store(0);      // 重置待退出数
+        liveNum.store(minNum); // 重置存活数为核心数
+        isInitTrue = true;     // 标记初始化成功
+
+        // 重新绑定条件变量到队列
+        if (TaskQ != nullptr) {
+            TaskQ->bindConditionVariable(&notEmpty);
+        }
+
+        // 重建核心工作线程
+        {
+            std::lock_guard<std::mutex> lock(poolMutex);
+            workersThread.reserve(maxNum);
+            for (int i = 0; i < minNum; ++i) {
+                workersThread.emplace_back(
+                    std::thread([this]() { this->workerFunc(); })
+                );
+                std::cout << PoolName << "[重启] 创建核心线程，tid=" << workersThread.back().tid << std::endl;
+            }
+        }
+
+        // 重建管理者线程（仅CACHED模式）
+        if (poolmode == PoolMode::CACHED) {
+            if (managerThread.joinable()) {
+                managerThread.join();
+            }
+            managerThread = std::thread([this]() { this->managerFunc(); });
+            std::cout << PoolName << "[重启] 创建管理者线程，tid=" << managerThread.get_id() << std::endl;
+        }
+
+        // 重建守护者线程（仅FIXED模式）
+        if (poolmode == PoolMode::FIXED) {
+            if (fixedGuardThread.joinable()) {
+                fixedGuardThread.join();
+            }
+            fixedGuardThread = std::thread([this]() { this->fixedGuardFunc(); });
+            std::cout << PoolName << "[重启] 创建守护者线程，tid=" << fixedGuardThread.get_id() << std::endl;
+        }
+
+    }
+    // 设置CACHED模式每次扩容的线程数
+    void setEverytimeAddCount(int num) {
+        if (poolmode != PoolMode::CACHED) {
+            std::cerr << PoolName << "[灵活调节] 仅CACHED模式支持" << std::endl;
+            return;
+        }
+        if (num <= 0) {
+            std::cerr << PoolName << "[灵活调节] 扩容数必须>0" << std::endl;
+            return;
+        }
+        std::lock_guard<std::mutex> lock(poolMutex);
+        ADDCOUNT = num;
+        std::cout << PoolName << "[灵活调节] 扩容数设置为：" << num << std::endl;
+    }
+    // 线程池重命名：仅支持已关闭的线程池
+    void Rename(std::string name) {
+        if (!shutdown.load()) {
+            std::cerr << PoolName << "[重命名] 仅关闭后支持重命名" << std::endl;
+            return;
+        }
+        std::cout << PoolName << "[重命名] 重命名为：" << name << std::endl;
+        PoolName = name;
+    }
+    // 获取存活线程数（对外接口）
+    int getLiveNum() const { return liveNum.load(); }
+    // 获取忙线程数（对外接口）
+    int getBusyNum() const { return busyNum.load(); }
+    // 获取队列当前任务数（对外接口）
+    int getQueueCurrentSize() const { return TaskQ->getCurrentSize(); }
+    // 获取队列最大容量（对外接口）
+    int getQueueMaxCapacity() const { return TaskQ->getMaxCapacity(); }
+    // 设置队列最大容量（对外接口）
+    void setQueueMaxCapacity(int capacity) {
+        if (TaskQ == nullptr || shutdown.load() || TaskQ->isQueueShutdown()) {
+            std::cerr << PoolName << "[任务队列改变容量] 设置失败：无效状态" << std::endl;
+            return;
+        }
+        TaskQ->setMaxCapacity(capacity);
+    }
+private:
     // 工作线程核心逻辑：循环取任务→执行任务→处理结果/异常
     void workerFunc() {
         std::thread::id curTid = std::this_thread::get_id(); // 获取当前线程ID
@@ -618,7 +693,6 @@ public:
         }
         std::cout << PoolName << "[守护者线程] [退出]，tid=" << curTid << std::endl;
     }
-
     // 管理者线程逻辑（仅CACHED模式）：动态扩缩容、清理已完成线程
     void managerFunc() {
         std::thread::id curTid = std::this_thread::get_id();
@@ -696,102 +770,6 @@ public:
             }
         }
         std::cout << PoolName << "[管理者线程] [退出]，tid=" << curTid << std::endl;
-    }
-
-    // 辅助接口：获取线程池名称（用于测试和日志）
-    std::string getPoolName() const {
-        return PoolName;
-    }
-
-    // 重启线程池：仅支持已关闭且队列未关闭的线程池
-    void resumePool() {
-        if (!shutdown.load() || TaskQ->isQueueShutdown()) {
-            std::cerr << PoolName << "[重启] 无法重启：未关闭或队列已关闭" << std::endl;
-            return;
-        }
-
-        shutdown.store(false); // 重置关闭标志
-        exitNum.store(0);      // 重置待退出数
-        liveNum.store(minNum); // 重置存活数为核心数
-        isInitTrue = true;     // 标记初始化成功
-
-        // 重新绑定条件变量到队列
-        if (TaskQ != nullptr) {
-            TaskQ->bindConditionVariable(&notEmpty);
-        }
-
-        // 重建核心工作线程
-        {
-            std::lock_guard<std::mutex> lock(poolMutex);
-            workersThread.reserve(maxNum);
-            for (int i = 0; i < minNum; ++i) {
-                workersThread.emplace_back(
-                    std::thread([this]() { this->workerFunc(); })
-                );
-                std::cout << PoolName << "[重启] 创建核心线程，tid=" << workersThread.back().tid << std::endl;
-            }
-        }
-
-        // 重建管理者线程（仅CACHED模式）
-        if (poolmode == PoolMode::CACHED) {
-            if (managerThread.joinable()) {
-                managerThread.join();
-            }
-            managerThread = std::thread([this]() { this->managerFunc(); });
-            std::cout << PoolName << "[重启] 创建管理者线程，tid=" << managerThread.get_id() << std::endl;
-        }
-
-        // 重建守护者线程（仅FIXED模式）
-        if (poolmode == PoolMode::FIXED) {
-            if (fixedGuardThread.joinable()) {
-                fixedGuardThread.join();
-            }
-            fixedGuardThread = std::thread([this]() { this->fixedGuardFunc(); });
-            std::cout << PoolName << "[重启] 创建守护者线程，tid=" << fixedGuardThread.get_id() << std::endl;
-        }
-
-    }
-
-    // 设置CACHED模式每次扩容的线程数
-    void setEverytimeAddCount(int num) {
-        if (poolmode != PoolMode::CACHED ) {
-            std::cerr << PoolName << "[灵活调节] 仅CACHED模式支持" << std::endl;
-            return;
-        }
-        if (num <= 0) {
-            std::cerr << PoolName << "[灵活调节] 扩容数必须>0" << std::endl;
-            return;
-        }
-        std::lock_guard<std::mutex> lock(poolMutex);
-        ADDCOUNT = num;
-        std::cout << PoolName << "[灵活调节] 扩容数设置为：" << num << std::endl;
-    }
-
-    // 线程池重命名：仅支持已关闭的线程池
-    void Rename(std::string name) {
-        if (!shutdown.load()) {
-            std::cerr << PoolName << "[重命名] 仅关闭后支持重命名" << std::endl;
-            return;
-        }
-        std::cout << PoolName << "[重命名] 重命名为：" << name << std::endl;
-        PoolName = name;
-    }
-
-    // 获取存活线程数（对外接口）
-    int getLiveNum() const { return liveNum.load(); }
-    // 获取忙线程数（对外接口）
-    int getBusyNum() const { return busyNum.load(); }
-    // 获取队列当前任务数（对外接口）
-    int getQueueCurrentSize() const { return TaskQ->getCurrentSize(); }
-    // 获取队列最大容量（对外接口）
-    int getQueueMaxCapacity() const { return TaskQ->getMaxCapacity(); }
-    // 设置队列最大容量（对外接口）
-    void setQueueMaxCapacity(int capacity) {
-        if (TaskQ == nullptr || shutdown.load() || TaskQ->isQueueShutdown()) {
-            std::cerr << PoolName << "[任务队列改变容量] 设置失败：无效状态" << std::endl;
-            return;
-        }
-        TaskQ->setMaxCapacity(capacity);
     }
 };
 
