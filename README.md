@@ -76,13 +76,18 @@
 1. 将项目文件分为 ThreadPool.hpp（头文件，包含核心实现）和 main（测试文件）；
 2. 编译命令(GCC)
 ```bash
-g++ main.cpp -o hreadpool_test -std=c++20 -lpthread
+g++ main.cpp -o threadpool_test -std=c++20 -lpthread  
+```
+```cmd
+g++ main.cpp -o threadpool_test -std=c++20    
 ```
 3. 运行
 ```
 ./threadpool_test    # Linux/macOS
 
 threadpool_test.exe  # Windows
+#若乱码，输入下方命令后重新启动
+chcp 65001
 ```
 
 ### 使用示例
