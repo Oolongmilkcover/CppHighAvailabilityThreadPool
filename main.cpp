@@ -66,7 +66,7 @@ void testMultiPoolShareQueue() {
     // 提交10个任务到共享队列（通过队列直接提交）
     std::cout << "\n提交10个任务到共享队列" << std::endl;
     for (int i = 0; i < 10; ++i) {
-        futures.push_back(sharedQueue.submitTask([i, &finishCount](const std::string& queueName) {
+        futures.emplace_back(sharedQueue.submitTask([i, &finishCount](const std::string& queueName) {
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
             std::cout << "共享队列任务" << i << "执行完成（队列：" << queueName << "）" << std::endl;
             finishCount++;
@@ -359,28 +359,56 @@ int main() {
     std::cout << "每一项测试都需要手动按下回车键后继续" << std::endl;
     std::getchar();
     testBasicFunction();
-    std::cout << "按下任意键后继续下一项测试" << std::endl;
+    std::cout << "按下回车键后继续下一项测试" << std::endl;
     std::getchar();
     testMultiPoolShareQueue();
-    std::cout << "按下任意键后继续下一项测试" << std::endl;
+    std::cout << "按下回车键后继续下一项测试" << std::endl;
     std::getchar();
     testCachedModeScale();
-    std::cout << "按下任意键后继续下一项测试" << std::endl;
+    std::cout << "按下回车键后继续下一项测试" << std::endl;
     std::getchar();
     testQueueCapacityLimit();
-    std::cout << "按下任意键后继续下一项测试" << std::endl;
+    std::cout << "按下回车键后继续下一项测试" << std::endl;
     std::getchar();
     testExceptionTransfer();
-    std::cout << "按下任意键后继续下一项测试" << std::endl;
+    std::cout << "按下回车键后继续下一项测试" << std::endl;
     std::getchar();
     testPoolDestructUnbind();
-    std::cout << "按下任意键后继续下一项测试" << std::endl;
+    std::cout << "按下回车键后继续下一项测试" << std::endl;
     std::getchar();
     testQueueShutdown();
-    std::cout << "按下任意键后继续下一项测试" << std::endl;
+    std::cout << "按下回车键后继续下一项测试" << std::endl;
     std::getchar();
     testHighConcurrency();
     std::cout << "\n==================================== 所有测试全部通过！====================================" << std::endl;
     return 0;
 }
+#endif
+
+
+
+#if 0 //这是在测试关闭队列后线程池能否处理队内剩余的任务 
+int add(int a,int b) {
+    std::cout << "开始执行add" << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    return a + b;
+}
+int main() {
+    TaskQueue taskq(100);
+    std::vector<std::future<std::any>> futures;
+    ThreadPool pool("pool", &taskq, PoolMode::FIXED,1);
+    pool.shutdownPool();
+    for (int i = 1; i <= 100; i++) {
+        futures.emplace_back(taskq.submitTask(add, i, i + 100));
+    }
+    taskq.shutdownQueue();
+    pool.resumePool();
+    int sum = 0;
+    for (auto& f : futures) {
+        sum += std::any_cast<int>(f.get());
+    }
+    std::cout << "程序结束,sum = "<<sum << std::endl;
+    return 0;
+}
+
 #endif

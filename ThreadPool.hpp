@@ -162,10 +162,11 @@ public:
     // 工作线程调用：从队列取出任务（非阻塞，无任务返回nullopt）
     std::optional<Task> taskTake() {
         std::lock_guard<std::mutex> lock(queueMutex); // 加锁保护队列操作
-        // 队列空或已关闭：返回空
-        if (taskQ.empty() || queueShutdown.load()) {
+        // 队列空：返回空
+        if (taskQ.empty()) {
             return std::nullopt;
         }
+
 
         // 取出队首任务（移动语义，避免拷贝）
         Task task = std::move(taskQ.front());
@@ -475,8 +476,8 @@ public:
     }
     // 重启线程池：仅支持已关闭且队列未关闭的线程池
     void resumePool() {
-        if (!shutdown.load() || TaskQ->isQueueShutdown()) {
-            std::cerr << PoolName << "[重启] 无法重启：未关闭或队列已关闭" << std::endl;
+        if (!shutdown.load()) {
+            std::cerr << PoolName << "[重启] 无法重启：未关闭" << std::endl;
             return;
         }
 
@@ -576,8 +577,8 @@ private:
                     return !TaskQ->empty() || shutdown.load() || (exitNum.load() > 0 && liveNum.load() > minNum.load());
                     });
 
-                // 优先检测关闭信号：线程池关闭或队列关闭→退出
-                if (shutdown.load() || TaskQ->isQueueShutdown()) {
+                // 优先检测关闭信号：线程池关闭→退出
+                if (shutdown.load()) {
                     lock.unlock();
                     break;
                 }
@@ -659,17 +660,22 @@ private:
     void fixedGuardFunc() {
         std::thread::id curTid = std::this_thread::get_id();
         std::cout << PoolName << "[守护者] [启动]，tid=" << curTid << std::endl;
-        while (!shutdown.load() && !TaskQ->isQueueShutdown()) {
+        while (!shutdown.load()) {
             fixedRebuildSem.acquire();  //也就是wait
             if (shutdown.load()) {
                 break;
             }
-            std::cout << PoolName << "[守护者] 收到线程退出信号，开始清理+补充" << std::endl;
-            workersThread.emplace_back(
-                std::thread([this]() { this->workerFunc(); })
-            );
-            liveNum++;
-            std::cout << PoolName << "[守护者] [rebulid]，tid=" << workersThread.back().tid << std::endl;
+
+            if (liveNum.load() < maxNum.load()) {
+                std::lock_guard<std::mutex> lock(poolMutex);
+                std::cout << PoolName << "[守护者] 收到线程退出信号，开始清理+补充" << std::endl;
+                workersThread.emplace_back(
+                    std::thread([this]() { this->workerFunc(); })
+                );
+                liveNum++;
+                std::cout << PoolName << "[守护者] [rebulid]，tid=" << workersThread.back().tid << std::endl;
+
+            }
             {
                 std::lock_guard<std::mutex> lock(poolMutex);  // 加锁保护线程列表
                 auto it = workersThread.begin();
